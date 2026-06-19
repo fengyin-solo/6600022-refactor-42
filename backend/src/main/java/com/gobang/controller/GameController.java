@@ -1,5 +1,6 @@
 package com.gobang.controller;
 
+import com.gobang.engine.GameEngine;
 import com.gobang.model.GameState;
 import com.gobang.service.AiService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,63 +18,59 @@ public class GameController {
     @Autowired
     private AiService aiService;
 
-    private final Map<String, GameState> games = new ConcurrentHashMap<>();
+    private final Map<String, GameEngine> games = new ConcurrentHashMap<>();
 
     @PostMapping("/new")
     public ResponseEntity<GameState> newGame() {
         String id = UUID.randomUUID().toString();
-        GameState game = new GameState(id);
-        games.put(id, game);
-        return ResponseEntity.ok(game);
+        GameEngine engine = new GameEngine(id);
+        games.put(id, engine);
+        return ResponseEntity.ok(engine.getState());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<GameState> getGame(@PathVariable String id) {
-        GameState game = games.get(id);
-        if (game == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(game);
+        GameEngine engine = games.get(id);
+        if (engine == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(engine.getState());
     }
 
     @PostMapping("/{id}/move")
     public ResponseEntity<?> makeMove(@PathVariable String id, @RequestBody Map<String, Integer> body) {
-        GameState game = games.get(id);
-        if (game == null) return ResponseEntity.notFound().build();
-        if (game.getWinner() != null) return ResponseEntity.badRequest().body("Game is over");
+        GameEngine engine = games.get(id);
+        if (engine == null) return ResponseEntity.notFound().build();
+        if (engine.getWinner() != null) return ResponseEntity.badRequest().body("Game is over");
 
         int row = body.getOrDefault("row", -1);
         int col = body.getOrDefault("col", -1);
 
-        if (!game.placeStone(row, col)) {
+        if (!engine.placeStone(row, col)) {
             return ResponseEntity.badRequest().body("Invalid move");
         }
-        return ResponseEntity.ok(game);
+        return ResponseEntity.ok(engine.getState());
     }
 
     @PostMapping("/{id}/ai-move")
     public ResponseEntity<?> aiMove(@PathVariable String id, @RequestBody Map<String, Integer> body) {
-        GameState game = games.get(id);
-        if (game == null) return ResponseEntity.notFound().build();
-        if (game.getWinner() != null) return ResponseEntity.badRequest().body("Game is over");
+        GameEngine engine = games.get(id);
+        if (engine == null) return ResponseEntity.notFound().build();
+        if (engine.getWinner() != null) return ResponseEntity.badRequest().body("Game is over");
 
         int aiPlayer = body.getOrDefault("player", GameState.WHITE);
         int depth = body.getOrDefault("depth", 3);
 
-        int[][] boardCopy = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
-        for (int r = 0; r < GameState.BOARD_SIZE; r++) {
-            System.arraycopy(game.getBoard()[r], 0, boardCopy[r], 0, GameState.BOARD_SIZE);
-        }
-
-        int[] move = aiService.getBestMove(boardCopy, aiPlayer, depth);
+        int[] move = aiService.getBestMove(engine.getBoard(), aiPlayer, depth, engine.getRules());
         if (move == null) return ResponseEntity.badRequest().body("No valid move");
 
-        game.placeStone(move[0], move[1]);
-        return ResponseEntity.ok(game);
+        engine.placeStone(move[0], move[1]);
+        return ResponseEntity.ok(engine.getState());
     }
 
     @GetMapping("/records")
     public ResponseEntity<List<GameState>> getRecords() {
         List<GameState> finished = games.values().stream()
-                .filter(g -> g.getWinner() != null)
+                .filter(e -> e.getWinner() != null)
+                .map(GameEngine::getState)
                 .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
                 .toList();
         return ResponseEntity.ok(finished);
