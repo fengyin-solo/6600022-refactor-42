@@ -57,8 +57,14 @@ export const useGameStore = defineStore('game', () => {
     replayVersion.value;
     return replayManager.moves;
   });
-  const isReplayPlaying = computed(() => replayManager.isPlaying);
-  const replaySpeed = computed(() => replayManager.speed);
+  const isReplayPlaying = computed(() => {
+    replayVersion.value;
+    return replayManager.isPlaying;
+  });
+  const replaySpeed = computed(() => {
+    replayVersion.value;
+    return replayManager.speed;
+  });
 
   replayManager.setOnChange(() => {
     replayVersion.value++;

@@ -1,7 +1,14 @@
 import type { BoardState, Move, GameRecord } from '../engine/types';
 import { createEmptyBoard, EMPTY } from '../engine/types';
 
-export type ReplayCallback = (board: BoardState, index: number) => void;
+export interface ReplayState {
+  board: BoardState;
+  index: number;
+  isPlaying: boolean;
+  speed: number;
+}
+
+export type ReplayCallback = (state: ReplayState) => void;
 
 export class ReplayManager {
   private _moves: Move[] = [];
@@ -111,18 +118,23 @@ export class ReplayManager {
       }
       this.stepForward();
     }, this._speed);
+    this.notifyChange();
   }
 
   pause(): void {
+    if (!this._isPlaying) return;
     this._isPlaying = false;
     if (this._timer) {
       clearInterval(this._timer);
       this._timer = null;
     }
+    this.notifyChange();
   }
 
   stop(): void {
+    const wasPlaying = this._isPlaying;
     this.pause();
+    if (!wasPlaying) this.notifyChange();
   }
 
   togglePlay(): void {
@@ -138,6 +150,8 @@ export class ReplayManager {
     if (this._isPlaying) {
       this.pause();
       this.play();
+    } else {
+      this.notifyChange();
     }
   }
 
@@ -151,7 +165,12 @@ export class ReplayManager {
 
   private notifyChange(): void {
     if (this._onChange) {
-      this._onChange(this._board, this._index);
+      this._onChange({
+        board: this._board,
+        index: this._index,
+        isPlaying: this._isPlaying,
+        speed: this._speed,
+      });
     }
   }
 
